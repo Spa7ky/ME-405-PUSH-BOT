@@ -9,12 +9,16 @@ Keys for getting TOF to operate
 '''
 from VL53L0X import VL53L0X
 from machine import I2C
+'''
 i2c = I2C(1,freq = 200000)
 TOF1 = VL53L0X(i2c)
 TOF1.start()
 TOF1.read()
 print('done TOF')
+'''
 
 '''
 MPU 
 '''
+from mpu9150 import MPU6050
+import pyb
