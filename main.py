@@ -9,6 +9,7 @@ Keys for getting TOF to operate
 '''
 from VL53L0X import VL53L0X
 from machine import I2C
+import utime
 '''
 i2c = I2C(1,freq = 200000)
 TOF1 = VL53L0X(i2c)
@@ -20,5 +21,12 @@ print('done TOF')
 '''
 MPU 
 '''
-from mpu9150 import MPU6050
-import pyb
+from imu import MPU6050
+i2c = I2C(1,freq = 200000)
+imu = MPU6050(i2c)
+while True:
+    print(imu.accel.xyz)
+    #print(imu.gyro.xyz)
+#print(imu.temperature)
+    #print(imu.accel.z)
+    utime.sleep(.5)
