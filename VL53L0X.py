@@ -340,4 +340,5 @@ class VL53L0X:
             raise TimeoutError()
         value = self._register(_RESULT_RANGE_STATUS + 10, struct='>H')
         self._register(_INTERRUPT_CLEAR, 0x01)
+        print(value)
         return value
