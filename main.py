@@ -11,6 +11,7 @@ from VL53L0X import VL53L0X
 from machine import I2C
 import utime
 from imu import MPU6050
+import math
 
 # Allocate memory so that exceptions raised in interrupt service routines can
 # generate useful diagnostic printouts
@@ -25,65 +26,88 @@ def Turn(direction = 1,angle = 60): # 0 = counter-clockwise, 1 = clockwise, angl
         controllerR.setpoint(-ticks)
         controllerL.setpoint(ticks)
 def MotorControlTask():
-    encoderR = EncoderDriver('PB6','PB7',4)
-    controllerR = ClosedLoopDriver(-200000,.04)
+    controllerR = ClosedLoopDriver(200000,.4)
     motorR = MotorDriver('PB10','PB4','PB5',3)
     encoderL = EncoderDriver('PC6','PC7',8)
-    controllerL = ClosedLoopDriver(-100000,.04)
-    motorL = MotorDriver('PC1','PA0','PA1',5)    
+    controllerL = ClosedLoopDriver(1,10000)
+    motorL = MotorDriver('PC1','PA0','PA1',5)  
     while True: 
         # Position Control Setup
-        measured_location = encoderR.EncoderTask()
-        level = controllerR.closed_loop(measured_location)
-        motorR.set_duty_cycle(level)    
+        measured_location = encoderR.Position()
+        print('Measured Location' +str(measured_location*.00436332))
+        level = controllerR.Pos_control(measured_location)
+        motorR.set_duty_cycle(level)
+         
+        
+        measured_velocity = encoderL.Velocity()
+        print('measured velocity'+str(measured_velocity))
+        level = controllerL.Vel_control(measured_velocity)
+        motorL.set_duty_cycle(level)  
         yield None
 def TOF_Task():
     TOF1 = VL53L0X(i2c)
-    TOF2 = VL53L0X(i2c2)
+    #TOF2 = VL53L0X(i2c2)
     TOF1.start()
-    TOF2.start()
-    TOF1Queue = task_share.Share('l')
-    TOF2Queue = task_share.Share('l')
+    #TOF2.start()
     while True:
-        TOF1Queue.put(TOF1.read())
-        TOF2Queue.put(TOF2.read())
-        print(TOF1Queue.get())
-        print(TOF2Queue.get())
+        TOF1Share.put(TOF1.read())
+        #TOF2Share.put(TOF2.read())
+        #print(TOF1Share.get())
+        #print(TOF2Share.get())
         yield None
 def IMU_Task():
 #i2c = I2C(1,freq = 200000)
-    shareIMU = task_share.Share('f')
     IMU = MPU6050(i2c)
     while True:
-        shareIMU.put(IMU.accel.x)
-        print(shareIMU.get())
+        shareIMU.put(IMU.gyro.z)
+        #print(shareIMU.get())
         yield None
 def LineSensorTask():
-    shareLine = task_share.Share('i')
     PA9 = pyb.Pin ('PA9',pyb.Pin.IN)
     while True:
         shareLine.put(PA9.value())
-        print(shareLine.get())
+        #print(shareLine.get())
         yield None
-def PositionTrackingTask():
-    motorR.Position
+def PositionTrackingTask(startOffset = 0,sampleRate = 1,r = 1): # in, s
+    A = startOffset#/.004363323 #ticks
+    B = 0
+    C = A
+    ticksnew = encoderR.Position()
+    while True:
+        ticksold = ticksnew
+        ticksnew = encoderR.Position()
+        A = C
+        B = (ticksnew-ticksold)*.004363323*r
+        anglec = (180-(shareIMU.get()*sampleRate))*.01745329
+        C = math.sqrt(math.pow(A,2)+math.pow(B,2)-(2*A*B*math.cos(anglec)))
+        print("C = "+str(C))
+        print('anglec = '+str(anglec))
+        yield None
 i2c = I2C(1,freq = 200000) #Uses bus 3 because of the pins it is connected to
-i2c2 = I2C(3,freq = 200000)
+#i2c2 = I2C(3,freq = 200000)        
+TOF1Share = task_share.Share('l')
+TOF2Share = task_share.Share('l')
+shareIMU = task_share.Share('f')
+shareLine = task_share.Share('i')  
+encoderR = EncoderDriver('PB6','PB7',4)      
 if __name__ == "__main__":
 
     print ('\033[2JTesting scheduler in cotask.py\n')
-    #task1 = cotask.Task (MoEnTask1, name = 'Task1' ,priority = 3,
-    #                    period = 50, profile = True, trace = False)
-    task2 = cotask.Task (LineSensorTask, name = 'Task2' ,priority = 3,
-                        period = 500, profile = True, trace = False)
-    task3 = cotask.Task (IMU_Task, name = 'Task3' ,priority = 3,
-                        period = 500, profile = True, trace = False)
-    task4 = cotask.Task (TOF_Task, name = 'Task4' ,priority = 3,
-                        period = 500, profile = True, trace = False)
-    #cotask.task_list.append (task1)
+    task1 = cotask.Task (MotorControlTask, name = 'Task1' ,priority = 5,
+                        period = 50, profile = True, trace = False)
+    task2 = cotask.Task (LineSensorTask, name = 'Task2' ,priority = 5,
+                        period = 50, profile = True, trace = False)
+    task3 = cotask.Task (IMU_Task, name = 'Task3' ,priority = 5,
+                        period = 1000, profile = True, trace = False)
+    task4 = cotask.Task (TOF_Task, name = 'Task4' ,priority = 5,
+                        period = 50, profile = True, trace = False)
+    task5 = cotask.Task (PositionTrackingTask, name = 'Task5' ,priority = 5,
+                        period = 50, profile = True, trace = False)
+    cotask.task_list.append (task1)
     cotask.task_list.append (task2)
     cotask.task_list.append (task3)
     cotask.task_list.append (task4)
+    cotask.task_list.append (task5)
     # A task which prints characters from a queue has automatically been
     # created in print_task.py; it is accessed by print_task.put_bytes()
 
