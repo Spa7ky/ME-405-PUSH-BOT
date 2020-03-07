@@ -22,7 +22,7 @@ class EncoderDriver:
     def read(self,name='motor'):
         '''Prints the current position of the motor'''
         print('Current position of '+str(name)+' is '+str(self.encTotal))
-    def EncoderTask(self):
+    def Position(self):
         '''Calculates the current position of the encoder by taking the new encoder position and subtracts it from the old encoder postion and stores a sum of the difference. This also checks if the change in postion will overflow in either direction and accounts for that. '''
         encOld = self.encNew
         self.encNew = self.enctimer.counter()
@@ -34,6 +34,15 @@ class EncoderDriver:
         self.encTotal += delta
         ## Current encoder postion is the sum of all the deltas.
         return self.encTotal
+    def Velocity(self):
+        encOld = self.encNew
+        self.encNew = self.enctimer.counter()
+        delta = self.encNew-encOld
+        if delta>32768:
+            delta = delta-65536
+        elif delta<-32768:
+            delta = delta+65536
+        return delta
     def zero(self):
         '''Resets the encoder position to zero.'''
         self.encTotal = 0

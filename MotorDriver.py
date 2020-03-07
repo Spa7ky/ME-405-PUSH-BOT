@@ -21,10 +21,10 @@ class MotorDriver:
         self.motorCh2 = self.motortimer.channel (2,pyb.Timer.PWM,pin = self.motorPin2)
     def set_duty_cycle(self,level=0):
         '''Sends a PWM signal to the motor based on the variable 'level'. Level can be any number from -100 to 100 and will default to 0 for safety reasons. If level is a positve value then it will rotate the motor clockwise, and will rotate the motor counterclockwise for negative values. '''
-        if level > 30:
-            level = 30
-        elif level < (-1)*(30):
-            level = (-1)*(30)
+        if level > 100:
+            level = 100
+        elif level < (-1)*(100):
+            level = (-1)*(100)
         if level < 0:
             self.motorCh2.pulse_width_percent (abs(level))
             self.motorCh1.pulse_width_percent (0)
