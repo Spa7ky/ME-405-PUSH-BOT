@@ -26,7 +26,7 @@ MPU
 from imu import MPU6050
 #i2c = I2C(1,freq = 200000)
 imu = MPU6050(i2c)
-#print(imu.accel.xyz)
+print(imu.accel.xyz)
 
 while True:
     print(imu.accel.xyz)
