@@ -35,10 +35,14 @@ class ClosedLoopDriver:
         actuation_sig = error * self.Kp
         #print(current_velocity)
         return actuation_sig
-    def changeSetpoint(self,setpoint):
+    def changePosSetpoint(self,Pos_setpoint):
         '''Allows the user to change the setpoint of the motor.'''
         ## Defines setpoint as the integer that was input into the function.
-        self.setpoint = setpoint
+        self.Pos_setpoint = Pos_setpoint
+    def changeVelSetpoint(self,Vel_setpoint):
+        '''Allows the user to change the setpoint of the motor.'''
+        ## Defines setpoint as the integer that was input into the function.
+        self.Vel_setpoint = Vel_setpoint
     def changeKp(self,Kp):
         '''Allows user to change the Kp value.'''
         ## Defines Kp as the integer that was input into the function.
