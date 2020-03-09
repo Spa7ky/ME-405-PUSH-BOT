@@ -1,7 +1,6 @@
 import pyb
 from micropython import const, alloc_emergency_exception_buf
 import gc
-
 import cotask
 import task_share
 from Encoder import EncoderDriver
@@ -17,46 +16,94 @@ import math
 # generate useful diagnostic printouts
 alloc_emergency_exception_buf (100)
 
-def Turn(direction = 1,angle = 60): # 0 = counter-clockwise, 1 = clockwise, angle in degrees
-    ticks = angle*4
-    if direction == 0:
-        controllerR.setpoint(ticks)
-        controllerL.setpoint(-ticks)
-    if direction == 1:
-        controllerR.setpoint(-ticks)
-        controllerL.setpoint(ticks)
 def MotorControlTask():
-    controllerR = ClosedLoopDriver(200000,.4)
-    motorR = MotorDriver('PB10','PB4','PB5',3)
-    encoderL = EncoderDriver('PC6','PC7',8)
-    controllerL = ClosedLoopDriver(1,10000)
-    motorL = MotorDriver('PC1','PA0','PA1',5)  
+    #STOPPED = const(0)
+    #SCANRIGHT = const(1)
+    #SCANLEFT = const(2)
+    #FORWARD = const(3)
+    state = 1
+    controllerR = ClosedLoopDriver(200000,1,10000)
+    motorR = MotorDriver()
+    controllerL = ClosedLoopDriver(200000,1,10000)
+    motorL = MotorDriver('PC1','PA0','PA1',5, 100)
     while True: 
+        '''
         # Position Control Setup
+        #Right Motor
         measured_location = encoderR.Position()
-        print('Measured Location' +str(measured_location*.00436332))
         level = controllerR.Pos_control(measured_location)
         motorR.set_duty_cycle(level)
-         
-        
+        #Left Motor
+        measured_location = encoderL.Position()
+        level = controllerL.Pos_control(measured_location)
+        motorL.set_duty_cycle(level)
+        '''
+        # Velocity Control Setup
+        #Right Motor
+        measured_velocity = encoderR.Velocity()
+        level = controllerR.Vel_control(measured_velocity)
+        motorR.set_duty_cycle(level) 
+        #Left Motor
         measured_velocity = encoderL.Velocity()
-        print('measured velocity'+str(measured_velocity))
         level = controllerL.Vel_control(measured_velocity)
-        motorL.set_duty_cycle(level)  
-        yield None
+        motorL.set_duty_cycle(level) 
+        
+        print('Im in the control loop!')
+        if state == const(0):  #STOP State
+            print('state 0')
+            controllerR.changeVelSetpoint(0)
+            controllerL.changeVelSetpoint(0)
+            #if IRShare.get() == 1: #change tasks when receiving correct IR data
+            #   state = 1
+            
+        #Right Scan State      
+        elif state == const(1):
+            print('state 1')
+            controllerR.changeVelSetpoint(-1)
+            controllerL.changeVelSetpoint(1)
+            if TOF1Share.get()< 8000 or TOF2Share.get()<8000:
+                state = 3
+        #Left Scan State
+        elif state == const(2):
+            print('state 2')
+            controllerR.changeVelSetpoint(1)
+            controllerL.changeVelSetpoint(-1)
+            if TOF1Share.get()< 8000 or TOF2Share.get()<8000:
+                state = 3
+        #Drive Straight State        
+        elif state == const(3):
+            print('state 3')
+            controllerR.changeVelSetpoint(1.50)
+            controllerL.changeVelSetpoint(1.50)
+            #if shareLine.get() == 0:
+            #    state = 4
+            if TOF1Share.get()>8000 and TOF2Share.get()<8000:
+                scan_flag = 'Left'
+            if TOF1Share.get()<8000 and TOF2Share.get()>8000:
+                scan_flag = 'Right'
+            if TOF1Share.get()>8000 and TOF2Share.get()>8000:
+                if scan_flag == 'Right':
+                    state = 1
+                elif scan_flag == 'Left':
+                    state = 2
+        elif state == const(4):
+            print('state 4')
+            state = 3
+        yield state
+        
 def TOF_Task():
+    i2c2 = I2C(3,freq = 200000) 
     TOF1 = VL53L0X(i2c)
-    #TOF2 = VL53L0X(i2c2)
+    TOF2 = VL53L0X(i2c2)
     TOF1.start()
-    #TOF2.start()
+    TOF2.start()
     while True:
         TOF1Share.put(TOF1.read())
-        #TOF2Share.put(TOF2.read())
-        #print(TOF1Share.get())
-        #print(TOF2Share.get())
+        TOF2Share.put(TOF2.read())
+        print('TOFL '+str(TOF1Share.get())+' mm')
+        print('TOFR '+str(TOF2Share.get())+' mm')
         yield None
 def IMU_Task():
-#i2c = I2C(1,freq = 200000)
     IMU = MPU6050(i2c)
     while True:
         shareIMU.put(IMU.gyro.z)
@@ -68,28 +115,62 @@ def LineSensorTask():
         shareLine.put(PA9.value())
         #print(shareLine.get())
         yield None
-def PositionTrackingTask(startOffset = 0,sampleRate = 1,r = 1): # in, s
+def PositionTrackingTask(startOffset = 0,sampleRate = 1,rwheel = 1, rbase = 3.1875): # in, s
     A = startOffset#/.004363323 #ticks
     B = 0
     C = A
-    ticksnew = encoderR.Position()
+    ticksnewR = encoderR.Position()
+    ticksnewL = encoderL.Position()
+    anglec = 3.1415
+    STRAIGHT = const (0)
+    TURNING = const (1)
+    state = 0
+    totalAngle = 0
     while True:
-        ticksold = ticksnew
-        ticksnew = encoderR.Position()
-        A = C
-        B = (ticksnew-ticksold)*.004363323*r
-        anglec = (180-(shareIMU.get()*sampleRate))*.01745329
-        C = math.sqrt(math.pow(A,2)+math.pow(B,2)-(2*A*B*math.cos(anglec)))
-        print("C = "+str(C))
-        print('anglec = '+str(anglec))
-        yield None
+        if state == STRAIGHT:
+            ticksoldR = ticksnewR
+            ticksoldL = ticksnewL
+            ticksnewR = encoderR.Position()
+            ticksnewL = encoderL.Position()
+            deltaR = ticksnewR-ticksoldR
+            print('deltaR'+str(deltaR))
+            deltaL = ticksnewL-ticksoldL
+            print('deltaL'+str(deltaL))
+            A = C
+            B = (ticksnewR-ticksoldR)*.004363323*rwheel
+            C = math.sqrt(math.pow(A,2)+math.pow(B,2)-(2*A*B*math.cos(anglec)))
+            print("C = "+str(C))
+            print('anglec = '+str(anglec))
+            if deltaR > 0 and deltaL < 0 or deltaR < 0 and deltaL >0:
+                state = TURNING
+        elif state == TURNING:
+            ticksoldR = ticksnewR
+            ticksoldL = ticksnewL
+            ticksnewR = encoderR.Position()
+            ticksnewL = encoderL.Position()
+            deltaR = ticksnewR-ticksoldR
+            print('deltaR'+str(deltaR)+' ticks')
+            deltaL = ticksnewL-ticksoldL
+            print('deltaL'+str(deltaL)+' ticks')
+            danglec = deltaR*(rwheel/rbase)*((2*3.1415)/1440)
+            totalAngle += danglec
+            print('Total Angle = '+str(totalAngle*(180/3.1415))+' degrees')
+            #anglec = (180-(shareIMU.get()*sampleRate))*.01745329
+            if deltaR>0 and deltaL>0 or deltaR<0 and deltaL<0:
+                state = STRAIGHT
+                anglec = 3.1415 - totalAngle
+                ticksnewR = encoderR.Position()
+                ticksnewL = encoderL.Position()
+        yield state
+            
+
 i2c = I2C(1,freq = 200000) #Uses bus 3 because of the pins it is connected to
-#i2c2 = I2C(3,freq = 200000)        
 TOF1Share = task_share.Share('l')
 TOF2Share = task_share.Share('l')
 shareIMU = task_share.Share('f')
 shareLine = task_share.Share('i')  
-encoderR = EncoderDriver('PB6','PB7',4)      
+encoderR = EncoderDriver('PB6','PB7',4,direction='clockwise')   
+encoderL = EncoderDriver('PC6','PC7',8,direction='counterclockwise')   
 if __name__ == "__main__":
 
     print ('\033[2JTesting scheduler in cotask.py\n')
@@ -98,7 +179,7 @@ if __name__ == "__main__":
     task2 = cotask.Task (LineSensorTask, name = 'Task2' ,priority = 5,
                         period = 50, profile = True, trace = False)
     task3 = cotask.Task (IMU_Task, name = 'Task3' ,priority = 5,
-                        period = 1000, profile = True, trace = False)
+                        period = 50, profile = True, trace = False)
     task4 = cotask.Task (TOF_Task, name = 'Task4' ,priority = 5,
                         period = 50, profile = True, trace = False)
     task5 = cotask.Task (PositionTrackingTask, name = 'Task5' ,priority = 5,
@@ -121,6 +202,7 @@ if __name__ == "__main__":
     vcp = pyb.USB_VCP ()
     while not vcp.any ():
         cotask.task_list.pri_sched ()
+        #print(task1.get_trace())
 
     # Empty the comm port buffer of the character(s) just pressed
     vcp.read ()
