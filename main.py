@@ -11,6 +11,7 @@ from machine import I2C
 import utime
 from imu import MPU6050
 import math
+import IRTask
 
 # Allocate memory so that exceptions raised in interrupt service routines can
 # generate useful diagnostic printouts
@@ -183,6 +184,9 @@ def PositionTrackingTask(startOffset = 0,sampleRate = 1,rwheel = 1, rbase = 3.18
 i2c = I2C(1,freq = 200000) #Uses bus 3 because of the pins it is connected to
 TOF1Share = task_share.Share('l')
 TOF2Share = task_share.Share('l')
+q0 = task_share.Queue ('I', 68, thread_protect = False, overwrite = False,
+                       name = "Queue_0")
+IRShare = task_share.Share('i')
 shareIMU = task_share.Share('f')
 shareLine = task_share.Share('i')  
 encoderR = EncoderDriver('PB6','PB7',4,direction='clockwise')   
@@ -190,21 +194,24 @@ encoderL = EncoderDriver('PC6','PC7',8,direction='counterclockwise')
 if __name__ == "__main__":
 
     print ('\033[2JTesting scheduler in cotask.py\n')
-    task1 = cotask.Task (MotorControlTask, name = 'Task1' ,priority = 5,
+    task1 = cotask.Task (MotorControlTask, name = 'Task1 MC' ,priority = 6,
                         period = 50, profile = True, trace = False)
-    task2 = cotask.Task (LineSensorTask, name = 'Task2' ,priority = 5,
+    task2 = cotask.Task (LineSensorTask, name = 'Task2 LS' ,priority = 5,
                         period = 50, profile = True, trace = False)
-    task3 = cotask.Task (IMU_Task, name = 'Task3' ,priority = 5,
+    task3 = cotask.Task (IMU_Task, name = 'Task3 IMU' ,priority = 1,
                         period = 50, profile = True, trace = False)
-    task4 = cotask.Task (TOF_Task, name = 'Task4' ,priority = 5,
+    task4 = cotask.Task (TOF_Task, name = 'Task4 TOF' ,priority = 5,
                         period = 50, profile = True, trace = False)
-    task5 = cotask.Task (PositionTrackingTask, name = 'Task5' ,priority = 5,
+    task5 = cotask.Task (PositionTrackingTask, name = 'Task5 PosTr' ,priority = 2,
                         period = 50, profile = True, trace = False)
+    task6 = cotask.Task (IRTask.ParsingTask, name = 'Task6 IR' ,priority = 4,
+                        period = 1000, profile = True, trace = False)
     cotask.task_list.append (task1)
     cotask.task_list.append (task2)
     cotask.task_list.append (task3)
     cotask.task_list.append (task4)
     cotask.task_list.append (task5)
+    cotask.task_list.append (task6)
     # A task which prints characters from a queue has automatically been
     # created in print_task.py; it is accessed by print_task.put_bytes()
 
