@@ -21,62 +21,69 @@ def MotorControlTask():
     #SCANRIGHT = const(1)
     #SCANLEFT = const(2)
     #FORWARD = const(3)
+    PosControl_flag = 0
+    VelControl_flag = 0
     state = 1
     controllerR = ClosedLoopDriver(200000,1,10000)
     motorR = MotorDriver()
     controllerL = ClosedLoopDriver(200000,1,10000)
     motorL = MotorDriver('PC1','PA0','PA1',5, 100)
     while True: 
-        '''
+        if PosControl_flag == 1:
+            
         # Position Control Setup
         #Right Motor
-        measured_location = encoderR.Position()
-        level = controllerR.Pos_control(measured_location)
-        motorR.set_duty_cycle(level)
+            measured_location = encoderR.Position()
+            level = controllerR.Pos_control(measured_location)
+            motorR.set_duty_cycle(level)
         #Left Motor
-        measured_location = encoderL.Position()
-        level = controllerL.Pos_control(measured_location)
-        motorL.set_duty_cycle(level)
-        '''
+            measured_location = encoderL.Position()
+            level = controllerL.Pos_control(measured_location)
+            motorL.set_duty_cycle(level)
+        if VelControl_flag == 1: 
         # Velocity Control Setup
         #Right Motor
-        measured_velocity = encoderR.Velocity()
-        level = controllerR.Vel_control(measured_velocity)
-        motorR.set_duty_cycle(level) 
+            measured_velocity = encoderR.Velocity()
+            level = controllerR.Vel_control(measured_velocity)
+            motorR.set_duty_cycle(level) 
         #Left Motor
-        measured_velocity = encoderL.Velocity()
-        level = controllerL.Vel_control(measured_velocity)
-        motorL.set_duty_cycle(level) 
+            measured_velocity = encoderL.Velocity()
+            level = controllerL.Vel_control(measured_velocity)
+            motorL.set_duty_cycle(level) 
         
         print('Im in the control loop!')
-        if state == const(0):  #STOP State
+        if state == 0:  #STOP State
             print('state 0')
-            controllerR.changeVelSetpoint(0)
-            controllerL.changeVelSetpoint(0)
-            #if IRShare.get() == 1: #change tasks when receiving correct IR data
-            #   state = 1
-            
+            if IRShare.get() == 1: #change tasks when receiving correct IR data
+                state = 1
+                VelControl_flag = 1
+                controllerR.changeVelSetpoint(-1)
+                controllerL.changeVelSetpoint(1)
         #Right Scan State      
-        elif state == const(1):
+        elif state == 1:
             print('state 1')
-            controllerR.changeVelSetpoint(-1)
-            controllerL.changeVelSetpoint(1)
             if TOF1Share.get()< 8000 or TOF2Share.get()<8000:
                 state = 3
+                controllerR.changeVelSetpoint(1.50)
+                controllerL.changeVelSetpoint(1.50)
         #Left Scan State
-        elif state == const(2):
+        elif state == 2:
             print('state 2')
-            controllerR.changeVelSetpoint(1)
-            controllerL.changeVelSetpoint(-1)
             if TOF1Share.get()< 8000 or TOF2Share.get()<8000:
                 state = 3
+                controllerR.changeVelSetpoint(1.50)
+                controllerL.changeVelSetpoint(1.50)
         #Drive Straight State        
-        elif state == const(3):
+        elif state == 3:
             print('state 3')
-            controllerR.changeVelSetpoint(1.50)
-            controllerL.changeVelSetpoint(1.50)
-            #if shareLine.get() == 0:
-            #    state = 4
+            if shareLine.get() == 0:
+                state = 4
+                VelControl_flag = 0
+                PosControl_flag = 1
+                deltaR = encoderR.Position() - 687
+                deltaL = encoderL.Position() - 687
+                controllerR.changePosSetpoint(deltaR)
+                controllerL.changePosSetpoint(deltaL)
             if TOF1Share.get()>8000 and TOF2Share.get()<8000:
                 scan_flag = 'Left'
             if TOF1Share.get()<8000 and TOF2Share.get()>8000:
@@ -84,11 +91,20 @@ def MotorControlTask():
             if TOF1Share.get()>8000 and TOF2Share.get()>8000:
                 if scan_flag == 'Right':
                     state = 1
+                    controllerR.changeVelSetpoint(-1)
+                    controllerL.changeVelSetpoint(1)
                 elif scan_flag == 'Left':
                     state = 2
-        elif state == const(4):
+                    controllerR.changeVelSetpoint(1)
+                    controllerL.changeVelSetpoint(-1)
+        elif state == 4:
             print('state 4')
-            state = 3
+            if encoderR.Position() == deltaR and encoderL.Position() == deltaL:    
+                state = 1
+                VelControl_flag = 1
+                PosControl_flag = 0
+                controllerR.changeVelSetpoint(-1)
+                controllerL.changeVelSetpoint(1)
         yield state
         
 def TOF_Task():

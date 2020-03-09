@@ -4,13 +4,14 @@ import utime
 
 class ClosedLoopDriver:
     '''This class creates a closed loop motor driver for the ME 405 board. It takes a setpoint and a Kp value as an input.'''
-    def __init__(self,Pos_setpoint = 20000,Vel_setpoint = 1.5,Kp = 1):
+    def __init__(self,Pos_setpoint = 20000,Vel_setpoint = 1.5,KpPos = 1,KpVel = 1):
         '''Initializes the motor controller object. This defualts to a setpoint of 20000 and a Kp value of 1. These can be changed when generating an object.'''
         ## Defines the setpoint
         self.Pos_setpoint = Pos_setpoint
         self.Vel_setpoint = Vel_setpoint
         ## Defines the Kp value
-        self.Kp = Kp
+        self.KpPos = KpPos
+        self.KpVel = KpVel
         ## Creates an empty list for the variable time.
         self.time = []
         ## Creates an empty list for the variable position.
@@ -23,7 +24,7 @@ class ClosedLoopDriver:
         ## Error is the difference between the setpoint and the current location. 
         error = self.Pos_setpoint -measured_location
         ## Actuation signal is the PWM signal to be sent to the motor based on the error.
-        actuation_sig = error * self.Kp
+        actuation_sig = error * self.KpPos
         ## Takes the current time and stores it in a growing list.
         return actuation_sig
     def Vel_control(self,deltaP):
@@ -32,7 +33,7 @@ class ClosedLoopDriver:
         ## Error is the difference between the setpoint and the current location. 
         error = self.Vel_setpoint -current_velocity
         ## Actuation signal is the PWM signal to be sent to the motor based on the error.
-        actuation_sig = error * self.Kp
+        actuation_sig = error * self.KpVel
         #print(current_velocity)
         return actuation_sig
     def changePosSetpoint(self,Pos_setpoint):
@@ -43,10 +44,14 @@ class ClosedLoopDriver:
         '''Allows the user to change the setpoint of the motor.'''
         ## Defines setpoint as the integer that was input into the function.
         self.Vel_setpoint = Vel_setpoint
-    def changeKp(self,Kp):
+    def changeKpPos(self,KpPos):
         '''Allows user to change the Kp value.'''
         ## Defines Kp as the integer that was input into the function.
-        self.Kp = Kp
+        self.KpPos = KpPos
+    def changeKpVel(self,KpVel):
+        '''Allows user to change the Kp value.'''
+        ## Defines Kp as the integer that was input into the function.
+        self.KpVel = KpVel
     def printStep(self):
         '''This function prints the step response of the motor. It will print the values in csv format with time in the first column and position in the second.'''
         ## turns time list into a list of strings.
