@@ -3,7 +3,7 @@
 import pyb
 class MotorDriver:
     '''This class creates a motor driver for the ME 405 board. An object can be made with an enable pin, two motor pins, and a timer pin as an input.'''
-    def __init__(self,enablePin1='PB10',motorPin1='PB4',motorPin2='PB5',motortimer=3,level_limit=100):
+    def __init__(self,enablePin1='PA10',motorPin1='PB4',motorPin2='PB5',motortimer=3,level_limit=100):
         '''Initializes the motor. This defaults pins PB4 and PB5 as the motor control pins, pin PA10 as the motor enable pin, and Timer 3 as the motor timer. Any other valid pin-timer input will work as well.'''
         ## Takes the first input pin and sets it as an output. This will enable the motor for use.
         self.enablePin1 = pyb.Pin (enablePin1,pyb.Pin.OUT_PP)

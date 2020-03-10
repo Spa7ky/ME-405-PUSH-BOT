@@ -18,18 +18,15 @@ import IRTask
 alloc_emergency_exception_buf (100)
 
 def MotorControlTask():
-    #STOPPED = const(0)
-    #SCANRIGHT = const(1)
-    #SCANLEFT = const(2)
-    #FORWARD = const(3)
     PosControl_flag = 0
     VelControl_flag = 0
-    state = 1
-    controllerR = ClosedLoopDriver(200000,1,10000)
-    motorR = MotorDriver()
-    controllerL = ClosedLoopDriver(200000,1,10000)
-    motorL = MotorDriver('PC1','PA0','PA1',5, 100)
+    state = 0
+   
     while True: 
+        if IRShare.get() != 41:
+            state = 0
+            controllerR.changeVelSetpoint(0)
+            controllerL.changeVelSetpoint(0)
         if PosControl_flag == 1:
             
         # Position Control Setup
@@ -55,7 +52,7 @@ def MotorControlTask():
         print('Im in the control loop!')
         if state == 0:  #STOP State
             print('state 0')
-            if IRShare.get() == 1: #change tasks when receiving correct IR data
+            if IRShare.get() == 41: #change tasks when receiving correct IR data
                 state = 1
                 VelControl_flag = 1
                 controllerR.changeVelSetpoint(-1)
@@ -190,7 +187,11 @@ IRShare = task_share.Share('i')
 shareIMU = task_share.Share('f')
 shareLine = task_share.Share('i')  
 encoderR = EncoderDriver('PB6','PB7',4,direction='clockwise')   
-encoderL = EncoderDriver('PC6','PC7',8,direction='counterclockwise')   
+encoderL = EncoderDriver('PC6','PC7',8,direction='counterclockwise') 
+controllerR = ClosedLoopDriver(0,0,.2,10000)
+motorR = MotorDriver()
+controllerL = ClosedLoopDriver(0,0,.2,10000)
+motorL = MotorDriver('PC1','PA0','PA1',5, 100)  
 if __name__ == "__main__":
 
     print ('\033[2JTesting scheduler in cotask.py\n')
