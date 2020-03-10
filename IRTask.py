@@ -3,9 +3,9 @@ import pyb
 import task_share
 from micropython import alloc_emergency_exception_buf
 
-q0 = task_share.Queue ('I', 68, thread_protect = False, overwrite = False,
-                       name = "Queue_0")
-IRShare = task_share.Share('i')
+#q0 = task_share.Queue ('I', 68, thread_protect = False, overwrite = False,
+#                       name = "Queue_0")
+#IRShare = task_share.Share('i')
 def IR_isr(IRtimer):        # timer capture value is passed into callback
     global fullFlag, start, pauseFlag
     if fullFlag == 0: # and pauseFlag == 0:
@@ -38,7 +38,7 @@ def ParsingTask():
             pauseFlag = 0
             utime.sleep_ms(5)
             '''
-        while fullFlag == 1:
+        if fullFlag == 1:
             IRdata.append(q0.get())
             if q0.empty():
                 #print(IRdata)
@@ -86,7 +86,7 @@ def ParsingTask():
                 listToStr4 = ''.join([str(elem) for elem in list4])
                 Address = (int(listToStr1,2))
                 Command = (int(listToStr3,2))
-                IRShare.put(Command)
+                IRShare.put(int(Command))
                 print('IRShare Command '+str(IRShare.get()))
                 #print('----------New Packet----------\nRaw:      0b'+str(listToStr)+'\n\n ADDR:    0b'+str(listToStr1)+'\nnADDR:    0b'+str(listToStr2)+'\n  CMD:    0b'+str(listToStr3)+'\n nCMD:    0b'+str(listToStr4)+'\n\nAddress (Decimal):    '+str(Address)+'\nCommand (Decimal):    '+str(Command)+'\n\n')
                 del IRdata[:]
