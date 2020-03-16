@@ -34,7 +34,7 @@ class ClosedLoopDriver:
         error = self.Vel_setpoint -current_velocity
         ## Actuation signal is the PWM signal to be sent to the motor based on the error.
         actuation_sig = error * self.KpVel
-        print(current_velocity)
+        #print(current_velocity)
         return actuation_sig
     def changePosSetpoint(self,Pos_setpoint):
         '''Allows the user to change the setpoint of the motor.'''
