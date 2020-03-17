@@ -1,3 +1,6 @@
+''' @file main.py
+    @author Aaron Erickson and Garrison Walters
+'''
 import pyb
 from micropython import const, alloc_emergency_exception_buf
 import gc
@@ -18,30 +21,30 @@ import math
 alloc_emergency_exception_buf (100)
 
 def MotorControlTask():
-    PosControl_flag = 0
-    VelControl_flag = 0
-    state = 1
-    TOFMaxRange = 400
-    Speed = 1.5
-    ActivateKey = 48
-    scan_flag = 'Right'
-    VelControl_flag = 1
-    controllerR.changeKpVel(10000)
+    ''' The Motor control task controls the two motors on the robot simultaneously 
+    in a velocity and position feedback loop. The loop and calculations are run simultaneously
+    but flags control which control lopp is used to set PWM level. '''
+    PosControl_flag = 0     # Allows closed loop control to be utilized 
+    VelControl_flag = 0     # Allows velocity closed loop control to be used
+    state = 0               # Sets initialization state
+    TOFMaxRange = 400       # Sets scan range of TOF sensor
+    Speed = 1.5             # Speed setpoint in ft-s
+    ActivateKey = 48        # IR activation key (1) press 
+    scan_flag = 'Right'     # Initialization of scan direction
+    VelControl_flag = 1     # Begins closed loop control using velocity
+    controllerR.changeKpVel(10000) # Sets Kv value
     controllerL.changeKpVel(10000)
                 
-    controllerR.changeVelSetpoint(-Speed)
+    controllerR.changeVelSetpoint(-Speed) # Sets starting speed
     controllerL.changeVelSetpoint(-Speed)
     while True: 
-        '''
-        if IRShare.get() != ActivateKey:
-            state = 0
-            controllerR.changeKpVel(20)
+        if IRShare.get() != ActivateKey:    # State 0, does not exit until IR command is recieved
+            state = 0 
+            controllerR.changeKpVel(20)     # changes Kv value for stopping
             controllerL.changeKpVel(20)
-            controllerR.changeVelSetpoint(0)
+            controllerR.changeVelSetpoint(0)#sets velocity to 0
             controllerL.changeVelSetpoint(0)
-            '''
-        
-        if PosControl_flag == 1:
+        if PosControl_flag == 1:            # allows position control to be used for following states
             
         # Position Control Setup
         #Right Motor
@@ -52,7 +55,7 @@ def MotorControlTask():
             measured_location = encoderL.Position()
             level = controllerL.Pos_control(measured_location)
             motorL.set_duty_cycle(level)
-        if VelControl_flag == 1: 
+        if VelControl_flag == 1:            # allows velocity control to be used for following states
         # Velocity Control Setup
         #Right Motor
             measured_velocity = encoderR.Velocity()
@@ -64,18 +67,14 @@ def MotorControlTask():
             motorL.set_duty_cycle(level) 
         
         #print('Im in the control loop!')
-        '''
         if state == 0 :  #STOP State
             #prin0t('state 0')
             #print('Print IR Share main'+str(IRShare.get()))
             if IRShare.get() == ActivateKey: #change tasks when receiving correct IR data
                 state = 1
                 print('state1')
-                '''
-
-                
         #Right Scan State      
-        if state == 1:
+        elif state == 1:
             print('state 1')
             if TOF1Share.get()< TOFMaxRange or TOF2Share.get()<TOFMaxRange:
                 state = 3
@@ -93,7 +92,6 @@ def MotorControlTask():
             print('state 3')
             #print('Encoder R '+str(encoderR.Velocity()))
             #print('Encoder L '+str(encoderL.Velocity()))
-            '''
             if shareLine.get() == 0:
                 state = 4
                 VelControl_flag = 0
@@ -102,10 +100,9 @@ def MotorControlTask():
                 deltaL = encoderL.Position() - 687
                 controllerR.changePosSetpoint(deltaR)
                 controllerL.changePosSetpoint(deltaL)
-                '''
-            if TOF1Share.get()>TOFMaxRange and TOF2Share.get()<TOFMaxRange:
+            if TOF1Share.get()>TOFMaxRange and TOF2Share.get()<TOFMaxRange: # tracks if bot traveled from right to left
                 scan_flag = 'Left'
-            if TOF1Share.get()<TOFMaxRange and TOF2Share.get()>TOFMaxRange:
+            if TOF1Share.get()<TOFMaxRange and TOF2Share.get()>TOFMaxRange: # left to rigt
                 scan_flag = 'Right'
             if TOF1Share.get()>TOFMaxRange and TOF2Share.get()>TOFMaxRange:
                 if scan_flag == 'Right':
@@ -116,7 +113,8 @@ def MotorControlTask():
                     state = 2
                     controllerR.changeVelSetpoint(Speed)
                     controllerL.changeVelSetpoint(Speed)
-        ''''elif state == 4:
+        # line sensor task
+        elif state == 4:
             #print('state 4')
             if encoderR.Position() == deltaR and encoderL.Position() == deltaL:
                 state = 1
@@ -124,9 +122,10 @@ def MotorControlTask():
                 PosControl_flag = 0
                 controllerR.changeVelSetpoint(-Speed)
                 controllerL.changeVelSetpoint(Speed)
-                '''
         yield state
 def TOF_Task():
+    ''' Time of flight sensor task. Sensors are initialized on an i2c bus and data
+    is collected based on the period of the task data is collected in a share'''
     i2c2 = I2C(3,freq = 200000) 
     TOF1 = VL53L0X(i2c)
     TOF2 = VL53L0X(i2c2)
@@ -139,18 +138,25 @@ def TOF_Task():
         #print('TOFR '+str(TOF2Share.get())+' mm')
         yield None
 def IMU_Task():
+    ''' Accelerometer is initialized on and i2c bus and data is collected with a share'''
     IMU = MPU6050(i2c)
     while True:
         shareIMU.put(IMU.gyro.z)
         #print(shareIMU.get())
         yield None
 def LineSensorTask():
+    ''' Infared line sensor's digital out put is collected here and stored in a share'''
     PA9 = pyb.Pin ('PA9',pyb.Pin.IN)
     while True:
         shareLine.put(PA9.value())
         #print(shareLine.get())
         yield None
 def PositionTrackingTask(startOffset = 0,sampleRate = 1,rwheel = 1, rbase = 3.1875): # in, s
+    ''' Position tracking through odemetry occurs here. Data from the encoders is collected 
+    and data is interpereted to determine if a turn is being executed. If a turn is occuring 
+    the angle of turn is calculated by using the known wheel base width and wheel radius
+    If the bot is traveling strait after a turn the resultant vector is calculated using 
+    law of cosines'''
     A = startOffset#/.004363323 #ticks
     B = 0
     C = A
@@ -162,7 +168,7 @@ def PositionTrackingTask(startOffset = 0,sampleRate = 1,rwheel = 1, rbase = 3.18
     state = 0
     totalAngle = 0
     while True:
-        if state == STRAIGHT:
+        if state == STRAIGHT:       # state 0 strait operating behavior is tracked
             ticksoldR = ticksnewR
             ticksoldL = ticksnewL
             ticksnewR = encoderR.Position()
@@ -178,7 +184,7 @@ def PositionTrackingTask(startOffset = 0,sampleRate = 1,rwheel = 1, rbase = 3.18
             #print('anglec = '+str(anglec))
             if deltaR > 0 and deltaL < 0 or deltaR < 0 and deltaL >0:
                 state = TURNING
-        elif state == TURNING:
+        elif state == TURNING:      # state 1 turning operating behavior is tracked
             ticksoldR = ticksnewR
             ticksoldL = ticksnewL
             ticksnewR = encoderR.Position()
@@ -187,7 +193,7 @@ def PositionTrackingTask(startOffset = 0,sampleRate = 1,rwheel = 1, rbase = 3.18
             #print('deltaR'+str(deltaR)+' ticks')
             deltaL = ticksnewL-ticksoldL
             #print('deltaL'+str(deltaL)+' ticks')
-            danglec = deltaR*(rwheel/rbase)*((2*3.1415)/1440)
+            danglec = deltaR*(rwheel/rbase)*((2*3.1415)/1440) #conversion from ticks to radians
             totalAngle += danglec
             #print('Total Angle = '+str(totalAngle*(180/3.1415))+' degrees')
             #anglec = (180-(shareIMU.get()*sampleRate))*.01745329
@@ -199,6 +205,8 @@ def PositionTrackingTask(startOffset = 0,sampleRate = 1,rwheel = 1, rbase = 3.18
         yield state
 
 def IR_isr(IRtimer):        # timer capture value is passed into callback
+    '''Interupt set up in capture mode, collecting time when ir sensor pulse is recieved
+    activated on rising and falling edge of signal'''
     global fullFlag, start, pauseFlag
     if fullFlag == 0: # and pauseFlag == 0:
         q0.put(IRtimer.channel(1).capture())
@@ -207,6 +215,7 @@ def IR_isr(IRtimer):        # timer capture value is passed into callback
     if q0.full():
         fullFlag = 1
 def ParsingTask():
+    ''' interperates ir data recieved from the isr outputs the command into a share'''
     alloc_emergency_exception_buf(100)
     IRpin = pyb.Pin ('PA8',pyb.Pin.IN)
     IRtimer = pyb.Timer(1,prescaler = 79,period = 65535)
@@ -219,18 +228,6 @@ def ParsingTask():
     parseData = []
     #print('entered Parsing Task')
     while True:
-        '''
-        if utime.ticks_diff(utime.ticks_ms(),start)>20 and utime.ticks_diff(utime.ticks_ms(),start)<130 and q0.any():
-            pauseFlag = 1 
-            print(utime.ticks_diff(utime.ticks_ms(),start))
-            while q0.any():
-                trash.append(q0.get())
-                print('trashcan'+str(trash[-1]))
-            del trash[:]
-            print('queue cleared')
-            pauseFlag = 0
-            utime.sleep_ms(5)
-            '''
         #print('tried')
         while fullFlag == 1:
             print('wasting time')
@@ -291,6 +288,7 @@ def ParsingTask():
                 yield None
         yield None
 
+'''Initialization of i2c, shares, queues, and objects used across multiple tasks'''
 i2c = I2C(1,freq = 200000) #Uses bus 3 because of the pins it is connected to
 TOF1Share = task_share.Share('l')
 TOF2Share = task_share.Share('l')
@@ -305,9 +303,6 @@ controllerR = ClosedLoopDriver(0,0,.2,100)
 motorR = MotorDriver()
 controllerL = ClosedLoopDriver(0,0,.2,20)
 motorL = MotorDriver('PC1','PA0','PA1',5, 100) 
-#nec = NecIr()
-#nec.callback(nec_cb) 
-
 
 if __name__ == "__main__":
 
@@ -325,11 +320,11 @@ if __name__ == "__main__":
     task6 = cotask.Task (ParsingTask, name = 'Task6 IR' ,priority = 4,
                         period = 100, profile = True, trace = False)
     cotask.task_list.append (task1)
-    #cotask.task_list.append (task2)
-    #cotask.task_list.append (task3)
+    cotask.task_list.append (task2)
+    cotask.task_list.append (task3)
     cotask.task_list.append (task4)
-    #cotask.task_list.append (task5)
-    #cotask.task_list.append (task6)
+    cotask.task_list.append (task5)
+    cotask.task_list.append (task6)
     # A task which prints characters from a queue has automatically been
     # created in print_task.py; it is accessed by print_task.put_bytes()
 
