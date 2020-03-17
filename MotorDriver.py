@@ -1,4 +1,4 @@
-''' file @MotorDriver.py
+''' @file MotorDriver.py
 '''
 import pyb
 class MotorDriver:

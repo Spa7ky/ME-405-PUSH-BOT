@@ -1,5 +1,5 @@
 '''
-@file VL53L0X
+@file VL53L0X.py
 Driver taken from 
 https://bitbucket.org/thesheep/micropython-vl53l0x/raw/9077f84e25409532b7ef220fa068605c971ba967/vl53l0x.py
 '''

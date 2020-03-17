@@ -1,4 +1,4 @@
-## file @vector3d.py
+## @file vector3d.py
 # vector3d.py 3D vector class for use in inertial measurement unit drivers
 # Authors Peter Hinch, Sebastian Plamauer
 

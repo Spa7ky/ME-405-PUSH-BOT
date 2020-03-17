@@ -1,4 +1,4 @@
-''' file @main.py
+''' @file main.py
     @author Aaron Erickson and Garrison Walters
 '''
 import pyb
